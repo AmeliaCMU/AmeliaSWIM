@@ -1,0 +1,1 @@
+blobfuse /home/airlab/data/azure_swim --tmp-path=/mnt/resource/blobfusetmp  --config-file=/home/airlab/boeing/boeing_swim_preprocess/scripts/fuse_connection.cfg -o attr_timeout=240 -o entry_timeout=240 -o negative_timeout=120
