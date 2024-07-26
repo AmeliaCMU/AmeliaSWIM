@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 class MinioFileDownloader:
     def __init__(self, endpoint="airlab-share-01.andrew.cmu.edu:9000", bucket_name="ameliaswim"):
-        self.client = Minio(endpoint, secure=False)
+        self.client = Minio(endpoint, secure=True)
         self.bucket_name = bucket_name
 
     def download_files(self, start_time, end_time, destination_folder,time_format="human"):

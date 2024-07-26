@@ -1,3 +1,7 @@
+#Data
+swim_out/
+swim_data/
+outputs/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
