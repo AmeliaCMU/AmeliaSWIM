@@ -1,19 +1,24 @@
 #!/bin/bash
 
-#SBATCH -p RM-shared
-#SBATCH -t 48:00:00
+#SBATCH -p cpu_long
+#SBATCH --account=nvr_av_end2endav
 #SBATCH --cpus-per-task=32
-#SBATCH -n 1
-#SBATCH -o /ocean/projects/cis220039p/jaypat/boeing/boeing_swim_preprocess/outputs/%j.out
+#SBATCH -t 2:00:00
+#SBATCH -J pretrain
 
 airport=$1
 data=$2
 
 set -x
-. /jet/home/jaypat/.bashrc
+source /home/jpatrikar/.bashrc
 
+conda init
+conda activate base
 conda activate swim
+source /lustre/fsw/portfolios/nvr/users/jpatrikar/anaconda3/bin/activate swim
 
-cd /ocean/projects/cis220039p/jaypat/boeing/boeing_swim_preprocess
 
-srun python process.py data=${data} airports=${airport}
+
+cd /lustre/fsw/portfolios/nvr/users/jpatrikar/AmeliaSWIM
+
+srun python process.py data=${data} airports=${airport} data.download=False data.outpath=/lustre/fsw/portfolios/nvr/users/jpatrikar/AmeliaSWIM/swim_out 

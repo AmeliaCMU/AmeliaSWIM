@@ -13,144 +13,82 @@ Zelin Ye, Jong Hoon Park, [Jean Oh](https://cmubig.github.io/team/jean_oh/) and 
 
 **Amelia-48** 
 
-[Amelia-48](https://ameliacmu.github.io/amelia-dataset/) dataset contains the trajectory as well .
-
-
-
+[Amelia-48](https://ameliacmu.github.io/amelia-dataset/) dataset contains the trajectory as well map data. More information is available on the dataset [website](https://ameliacmu.github.io/amelia-dataset/). 
 
 ## Pre-requisites
 
 ### Installation
 
-#### Basic Setup
-
 Install and activate the environment:
 ```bash
+conda env create -f environment.yml
 conda activate swim
 ```
-#### Download raw files:
+## Download raw files:
 
-The raw SWIM .njson.gz files can be downloaded using the following scripts:
+The raw SWIM SMES `.njson.gz` files can be downloaded using the following scripts:
 
-Download the GitHub repository and install requirements:
+```
+python download_raw.py 
+```
+### Options:
 
-```bash
-git clone git@github.com:AmeliaCMU/AmeliaTF.git
-cd AmeliaTF
-pip install -e .
+```
+  -h, --help            show this help message and exit
+  --endpoint ENDPOINT   MinIO server endpoint
+  --bucket BUCKET       Name of the bucket to download files from
+  --start_time START_TIME
+                        Start time in the format YYYY-MM-DD HH:MM:SS (default: 2023-01-01 00:00:00)
+  --end_time END_TIME   End time in the format YYYY-MM-DD HH:MM:SS (default: 2023-01-02 00:00:00)
+  --destination DESTINATION
+                        Local directory to save the downloaded files
 ```
 
-#### Full Setup
+## Pre-Processed Data
+Pre-processed data for 10 airports can be found at []()
 
-If you're interested in using all of our [tools](https://ameliacmu.github.io/amelia-dataset/), you can install our framework through this [script](https://github.com/AmeliaCMU/AmeliaScenes/install.sh).
+## Process Data
+To process more data for any of the 48 airports in the [Data Tracker](https://ameliacmu.github.io/amelia-dataset/) for any time  after Dec 1 2022, use the following script:
 
-### Dataset
-
-To run this repository, you first need to download the amelia dataset. Follow the instructions [here](https://github.com/AmeliaCMU/AmeliaScenes/DATASET.md) to download and setup the dataset.
-
-Once downloaded, create a symbolic link into  ```datasets```:
-
-```bash
-cd datasets
-ln -s /path/to/the/amelia/dataset .
+```
+python process.py data=<insert month> airports=<airport ICAO>
 ```
 
-### Scenario Pre-processing
-
-Once you've downloaded the dataset and installed the required modules. You need to post-process the dataset. Follow the instructions [here](https://github.com/AmeliaCMU/AmeliaScenes/README.md).
-
-### Additional Notes
-
-Our repository's structure is based on this [template](https://github.com/ashleve/lightning-hydra-template), which uses Hydra and Pytorch Lightning. We recommend going through their [README](https://github.com/ashleve/lightning-hydra-template?tab=readme-ov-file#your-superpowers) for further details into the code's functionalities.
-
-## How to use
-
-Activate your amelia environment (**Please make sure to follow the pre-requisites guidelines above above**):
-
-```bash
-conda activate amelia
+For example; if you would like to process the data for KSEA for Jan 2023
+```
+python process.py data=jan airports=ksea
 ```
 
-### Training a Model
+### Options:
 
-The general format for running a training experiment is:
+In `conf/data/base` the following options exist:
 
-```bash
-python src/train.py data=[data_config] model=[model_config] trainer=[trainer_config]
+
+- datapath: #Base Path for Raw Data
+- outpath: #Base Path for Processed Data
+- window: #Time (in sec) Duration for each CSV
+- n_jobs: #Num cpus to use
+- parallel: #Use parallel processing
+- download: #Download the Raw Data (set to false if you already have the raw data)
+- start_time:  #utc linux start time 
+- end_datetime:  #utc linux end time 
+
+In `conf/airports/<airport ICAO>` the following options exist:
+
+
+- airport: #Name of the airport
+- ref_lat: #Ref latitude to calculate  x,y cartesian
+- ref_lon: #Ref longitude to calculate  x,y cartesian
+- max_alt: #Max agent altitude to filter
+- fence: #Geo-fence to filter data
+
+### Available combinations:
 ```
-
-where:
-
-- ```[data_config]```, represents a dataset configuration specified under ```./configs/data```
-- ```[model_config]```, represents a model configuration specified under ```./configs/model```
-- ```[trainer_config]```, represents the trainer to be used, (e.g., CPU, GPU, DDP, etc), specified under ```./configs/trainer```
-
-For example, to train our model on GPU using all of our currently supported airports, you would run:
-
-```bash
-python src/train.py data=seen-all model=marginal trainer=gpu
+airports: katl, kaus, kbdl, kbfi, kbna, kbos, kbwi, kcle, kclt, kcvg, kdab, kdal, kdca, kden, kdfw, kdtw, kewr, kfll, khou, khwd, kiad, kiah, kjfk, klas, klax, klga, kmci, kmco, kmdw, kmem, kmia, kmke, kmsp, kmsy, koak, kord, korl, kpdx, kphl, kphx, kpit, kpvd, kpwk, ksan, ksdf, ksea, ksfo, ksjc, kslc, ksna, kstl, kteb, panc, phnl
 ```
-
-### Evaluating a Model
-
-If you already have a pre-trained checkpoint you can run evaluation only using `eval.py` and following a similar format as above. However, you need to provide the path to the pre-trained weights. For example,
-
-`bash
-python src/eval.py data=seen-all model=marginal trainer=gpu ckpt_path=/path/to/pretrained/weights.ckpt
-`
-
-### Our experiments
-
-We provide the configuration combination to run our experiments, as well as our pre-trained weights.
-
-#### Single-Airport Experiments (Table 5 in our paper)
-
-The model configuration used for all of these experiments was `marginal.yaml`.
-
-| Airport                                   | Airport ICAO | Data Config | ADE@20 | FDE@20 | ADE@50 | FDE@50 | Weights  |
-|:-----------------------------------------:|:------------:|:-----------:|:------:| :----: | :----: | :----: | :------: |
-| Ted Stevens Anchorage Intl. Airport       |      PANC    | `panc.yaml` | 10.11  | 20.87  | 38.84  | 101.89 | [panc](todo) |
-| Boston-Logan Intl. Airport                |      KBOS    | `kbos.yaml` |  5.58  | 10.90  | 21.34  |  53.76 | [kbos](todo) |
-| Ronald Reagan Washington Natl. Airport    |      KDCA    | `kdca.yaml` |  4.74  |  9.22  | 16.42  |  40.57 | [kdca](todo) |
-| Newark Liberty Intl. Airport              |      KEWR    | `kewr.yaml` |  6.61  | 12.92  | 23.68  |  57.63 | [kewr](todo) |
-| John F. Kennedy Intl. Airport             |      KJFK    | `kjfk.yaml` |  4.58  |  9.52  | 17.11  |  41.19 | [kjfk](todo) |
-| Los Angeles Intl. Airport                 |      KLAX    | `klax.yaml` | 11.36  | 20.63  | 36.08  |  88.25 | [klax](todo) |
-| Chicago-Midway Intl. Airport              |      KMDW    | `kmdw.yaml` |  3.30  |  6.12  | 11.50  |  28.80 | [kmdw](todo) |
-| Louis Armstrong New Orleans Intl. Airport |      KMSY    | `kmsy.yaml` |  2.73  |  5.12  |  9.89  |  25.68 | [kmsy](todo) |
-| Seattle-Tacoma Intl. Airport              |      KSEA    | `ksea.yaml` |  9.76  | 18.35  | 29.94  |  65.82 | [ksea](todo) |
-| San Francisco Intl. Airport               |      KSFO    | `ksfo.yaml` |  5.06  |  9.82  | 17.05  |  40.23 | [ksfo](todo) |
-
-<hr>
-
-#### Multi-Airport Experiments (Table 6 and 8 in our paper)
-
-The model configuration used for all of these experiments was also `marginal.yaml`.
-
-| Seen Airport(s)                                            | Unseen Airport(s)                                    | Data Config     | Avg. ADE@20 | Avg. FDE@20 | Avg. ADE@50 | Avg. FDE@50 | Weights |
-| :--------------------------------------------------------: | :--------------------------------------------------: | :-------------: | :---------: | :---------: | :---------: | :---------: | :-----: |
-| KMDW                                                       | KEWR, KBOS, KSFO, KSEA, KDCA, PANC, KLAX, KJFK, KMSY | `seen-1.yaml`   |     3.30    |     6.12    |    11.50    |    28.80    | [seen-1](todo) |
-| KMDW, KEWR                                                 | KBOS, KSFO, KSEA, KDCA, PANC, KLAX, KJFK, KMSY       | `seen-2.yaml`   |     3.31    |     6.23    |    11.84    |    28.89    | [seen-2](todo) |
-| KMDW, KEWR, KBOS                                           | KSFO, KSEA, KDCA, PANC, KLAX, KJFK, KMSY             | `seen-3.yaml`   |     3.26    |     6.59    |    12.46    |    31.81    | [seen-3](todo) |
-| KMDW, KEWR, KBOS, KSFO                                     | KSEA, KDCA, PANC, KLAX, KJFK, KMSY                   | `seen-4.yaml`   |     3.52    |     6.74    |    12.71    |    31.64    | [seen-4](todo) |
-| KMDW, KEWR, KBOS, KSFO, KSEA, KDCA, PANC                   | KLAX, KJFK, KMSY                                     | `seen-7.yaml`   |     3.59    |     7.03    |    14.35    |    38.62    | [seen-7](todo) |
-| KMDW, KEWR, KBOS, KSFO, KSEA, KDCA, PANC, KLAX, KJFK, KMSY | -                                                    | `seen-all.yaml` |     3.88    |     7.70    |    15.30    |    40.91    | [seen-all](todo) |
-
-<hr>
-
-#### Other Experiments
-
-- We trained our models under a **marginal** prediction setting, but we have support for training models on a **joint** prediction setting. To change the prediction paradigm, change the model parameter to `joint`. For example:
-
-```bash
-python src/train.py data=seen-all model=joint trainer=gpu
 ```
-
-- Our model can be trained with and without context (maps). To train the trajectory-only model, use either `marginal_traj` or `joint_traj` configurations. For example,
-
-```bash
-python src/train.py data=seen-all model=marginal_traj trainer=gpu
+data: apr, aug, base, dec, default, feb, jan, jul, jun, mar, may, nov, oct, sep
 ```
-
 <hr>
 
 ## BibTeX

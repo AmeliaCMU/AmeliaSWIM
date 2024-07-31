@@ -2,16 +2,13 @@
 
 # Define an array of tuples, each containing 2 strings
 list=(
-    "kbos jan"
-    "kdca apr"
-    "kewr mar"    
-    "kjfk apr"
-    "klax may"
-    "kmdw jun"
-    "kmsy jul"
-    "ksea aug"
-    "ksfo sep"    
-    "panc nov"    
+    "kpwk default"
+    "kbfi default"    
+    "khwd default"
+    "kmem default"
+    "kmke default"
+    "koak default"
+    "korl default"
 )
 
 # Iterate through each tuple

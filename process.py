@@ -142,7 +142,20 @@ class Data:
                 for line in f:
                     obj = json.loads(line)
                     myroot = ET.fromstring(obj["body"])
-                    if myroot[0].text == "KSFO":
+                    ##replacements for tracon
+                    if self.airport == "KPWK":
+                        airport = "KORD"
+                    elif self.airport == "KOAK":
+                        airport = "KSFO"
+                    elif self.airport == "KBFI":
+                        airport = "KSEA"
+                    elif self.airport == "KHWD":
+                        airport = "KSFO"
+                    elif self.airport == "KORL":
+                        airport = "KMCO"
+                    else:
+                        airport = self.airport
+                    if myroot[0].text == airport:
                         for x in myroot.findall("positionReport"):
                             k = x.find("stid").text
                             self.pos = defaultdict(lambda: defaultdict())
@@ -323,7 +336,7 @@ class Data:
                 df["Type"].fillna(2, inplace=True)
                 # df.to_csv('test_after_fillna.csv') # save a ckpt csv for testing
                 df = df.dropna()
-                df.to_csv("test_after_dropna.csv")  # save a ckpt csv for testing
+                # df.to_csv("test_after_dropna.csv")  # save a ckpt csv for testing
 
                 df.reset_index(level=0, inplace=True)
 
@@ -334,11 +347,14 @@ class Data:
                 df = df[df["geometry"] == True]
                 del df["geometry"]
                 df = df.sort_values(by="datetime")
-
+                if df.empty:
+                    print("Error: DataFrame is empty!")
+                    self.start_time = self.start_time + self.cfg.data.window
+                    self.end_time = self.end_time + self.cfg.data.window
+                    continue
                 # additional cols for traj pred compatibility
                 df = df.assign(x=lambda x: (x["Range"] * np.cos(x["Bearing"])))
                 df = df.assign(y=lambda x: (x["Range"] * np.sin(x["Bearing"])))
-                print(df)
                 df["time"] = df.index
                 first = df["time"].iloc[0]
                 df["Frame"] = (df["time"] - first).dt.total_seconds()
