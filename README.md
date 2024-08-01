@@ -11,11 +11,14 @@ Zelin Ye, Jong Hoon Park, [Jean Oh](https://cmubig.github.io/team/jean_oh/) and 
 
 ## Overview
 
-**Amelia-48** 
-
 [Amelia-48](https://ameliacmu.github.io/amelia-dataset/) dataset contains the trajectory as well map data. More information is available on the dataset [website](https://ameliacmu.github.io/amelia-dataset/). 
 
-## Pre-requisites
+
+## Processed Data for 10 airports
+Pre-processed data (trajectory+map) for 10 airports [list](https://ameliacmu.github.io/amelia-dataset/) can be found at [dataset](https://airlab-share-01.andrew.cmu.edu:9000/amelia-processed/amelia-10.zip)
+
+## Process Data
+To process more trajectory data for any of the 48 airports in the [Data Tracker](https://ameliacmu.github.io/amelia-dataset/) for any time after Dec 1 2022, use the following steps:
 
 ### Installation
 
@@ -24,14 +27,14 @@ Install and activate the environment:
 conda env create -f environment.yml
 conda activate swim
 ```
-## Download raw files:
+### Download raw files:
 
 The raw SWIM SMES `.njson.gz` files can be downloaded using the following scripts:
 
 ```
 python download_raw.py 
 ```
-### Options:
+#### Options:
 
 ```
   -h, --help            show this help message and exit
@@ -44,11 +47,9 @@ python download_raw.py
                         Local directory to save the downloaded files
 ```
 
-## Pre-Processed Data
-Pre-processed data for 10 airports can be found at []()
 
-## Process Data
-To process more data for any of the 48 airports in the [Data Tracker](https://ameliacmu.github.io/amelia-dataset/) for any time  after Dec 1 2022, use the following script:
+
+### Process Data
 
 ```
 python process.py data=<insert month> airports=<airport ICAO>
@@ -59,7 +60,7 @@ For example; if you would like to process the data for KSEA for Jan 2023
 python process.py data=jan airports=ksea
 ```
 
-### Options:
+#### Options:
 
 In `conf/data/base` the following options exist:
 
@@ -82,7 +83,7 @@ In `conf/airports/<airport ICAO>` the following options exist:
 - max_alt: #Max agent altitude to filter
 - fence: #Geo-fence to filter data
 
-### Available combinations:
+#### Available combinations:
 ```
 airports: katl, kaus, kbdl, kbfi, kbna, kbos, kbwi, kcle, kclt, kcvg, kdab, kdal, kdca, kden, kdfw, kdtw, kewr, kfll, khou, khwd, kiad, kiah, kjfk, klas, klax, klga, kmci, kmco, kmdw, kmem, kmia, kmke, kmsp, kmsy, koak, kord, korl, kpdx, kphl, kphx, kpit, kpvd, kpwk, ksan, ksdf, ksea, ksfo, ksjc, kslc, ksna, kstl, kteb, panc, phnl
 ```
