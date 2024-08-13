@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='amelia_swim',
-    packages=find_packages(['./scripts/*']),
+    packages=find_packages(['./*']),
     version='1.0',
     url="https://github.com/AmeliaCMU/AmeliaSWIM",
     description='',
