@@ -2,6 +2,7 @@
 swim_out/
 swim_data/
 outputs/
+out
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
