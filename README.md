@@ -50,15 +50,6 @@ Activate your amelia environment (**Please follow the installation instructions 
 conda activate amelia
 ```
 
-<!-- ### Installation
-
-Install and activate the environment:
-
-```bash
-conda env create -f environment.yml
-conda activate swim
-``` -->
-
 ### Download raw files
 
 The raw SWIM SMES `.njson.gz` files can be downloaded using the following scripts:
@@ -97,9 +88,10 @@ In `conf/data/base` the following options exist:
 - `datapath`: Base Path for Raw Data
 - `outpath`: Base Path for Processed Data
 - `window`: Time (in sec) Duration for each CSV
-- `n_jobs`: Num cpus to use
+- `n_jobs`: Num CPUs to use
 - `parallel`: Use parallel processing
 - `download`: Download the Raw Data (set to false if you already have the raw data)
+- `overwrite`: Overwrite the processed data if it is found
 - `start_time`: utc linux start time
 - `end_datetime`: utc linux end time
 
@@ -113,11 +105,60 @@ In `conf/airports/<airport ICAO>` the following options exist:
 
 #### Example
 
-If you would like to process the data for KSEA for Jan 2023
+If you would like to process the data for KLAX for Mar 2023 overwriting the existing and not downloading data a you can run the following command:
 
 ```bash
-python process.py data=jan airports=ksea
+python python process.py data=mar airports=klax data.overwrite=True data.download=False
 ```
+
+## Modify / Create Polygons
+
+In order to modify or create new polygons, we used the [QGIS](https://qgis.org/en/site/) software.
+
+<div align="center">
+  <img width="200" src="./assets/QGIS-LTR.png" alt="QGIS">
+  <h5>QGIS Software Logo.</h5>
+</div>
+
+### Loading CSV file and creating polygons
+
+1. Open QGIS
+2. Click on `Layer` -> `Add Layer` -> `Add Delimited Text Layer`
+3. Select the Layer
+4. In Processing Toolbox search for Points to Path
+5. In Processing Toolbox search for Lines to Polygons
+
+<div align="center">
+  <img width="500" src="./assets/QGIS_add_layer.png" alt="QGIST">
+  <h5>QGIS Add Layer</h5>
+</div>
+
+### Modify Polygons
+
+1. Select the layer
+2. Click on `Toggle Editing` (yellow pencil)
+3. Click on the `Split Parts` or `Split Features` tool
+4. Create lines to split the polygon using right click and left click
+
+<div align="center">
+  <img width="500" src="./assets/QGIS_tools.png" alt="QGIST">
+  <h5>QGIS Tools</h5>
+</div>
+
+### Export Polygon's coordinates
+
+1. Right click on the layer
+2. Click on `Open Attribute Table`
+3. Select the Polygon you want to export (it will be highlighted in yellow)
+4. Click on copy
+
+<div align="center">
+  <img width="200" src="./assets/QGIS_attribute_table.png" alt="QGIST">
+  <img width="500" src="./assets/QGIS_features_tool.png" alt="QGIST">
+  <h5>QGIS Coordinates</h5>
+</div>
+
+Once copied it can be pasted in a notepad to create a csv file
 
 <hr>
 
