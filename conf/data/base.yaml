@@ -1,6 +1,7 @@
-datapath: "swim_data/"
-outpath: "swim_out/"
+datapath: "out/klax"
+outpath: "out_data/klax"
 window: 3600 ##sec
 n_jobs: -1 #num cpus
 parallel: True
 download: True
+overwrite: False
