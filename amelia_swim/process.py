@@ -1,4 +1,4 @@
-from download_raw import MinioFileDownloader
+from amelia_swim.download_raw import MinioFileDownloader
 from hydra.utils import instantiate
 import hydra
 import logging
