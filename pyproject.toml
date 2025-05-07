@@ -11,7 +11,7 @@ requires-python = ">=3.9, <4.0"
 dependencies = [
     'setuptools',
     'tqdm==4.65.0',
-    'minio',
+    'minio==7.2.7',
     'numpy==1.21.2',
     'pykml',
     'easydict==1.10',
@@ -32,7 +32,8 @@ authors = [
     {name = "Jong Hoon Park"},
 ]
 
-
+[tool.setuptools]
+packages = ["amelia_swim"]
 
 [project.urls]
 Repository = "https://github.com/AmeliaCMU/AmeliaSWIM"

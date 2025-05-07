@@ -28,4 +28,7 @@ fence:
       [38.84042745, -77.04279827]
     ]
   ]
+<<<<<<< HEAD:conf/airports/kdca_outer.yaml
 map_dir: "/jet/home/jaypat/boeing_swim_preprocess/maps/kdca"
+=======
+>>>>>>> feature/py39_v:amelia_swim/conf/airports/kdca_outer.yaml

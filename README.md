@@ -34,13 +34,13 @@ Alternatively, refer to [`INSTALL.md`](https://github.com/AmeliaCMU/AmeliaScenes
 
 **Note:** AmeliaSWIM only requires the itself to run, only refer to AmeliaSWIM installation.
 
-## Pre-processed Data for 10 airports
+## Processed Data for 10 airports
 
-Pre-processed data (trajectory+map) for 10 airports [list](https://ameliacmu.github.io/amelia-dataset/) can be found at [dataset](https://airlab-share-01.andrew.cmu.edu:9000/amelia-processed/amelia-10.zip)
+Processed data (trajectory+map) for 10 airports [list](https://ameliacmu.github.io/amelia-dataset/) can be found at [dataset](https://airlab-share-01.andrew.cmu.edu:9000/amelia-processed/amelia-10.zip)
 
-## Process Data for any of the 48 airports
+## Raw Data for any of the 48 airports
 
-To process more trajectory data for any of the 48 airports in the [Data Tracker](https://ameliacmu.github.io/amelia-dataset/) for any time after Dec 1 2022, use the following steps
+To download and convert trajectory data for any of the 48 airports in the [Data Tracker](https://ameliacmu.github.io/amelia-dataset/) for any time after Dec 1 2022, use the following steps
 
 ## How to use
 

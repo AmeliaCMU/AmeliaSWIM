@@ -1,0 +1,9 @@
+root_dir: ../
+
+datapath: ${data.root_dir}/out/raw
+outpath: ${data.root_dir}/out/${airports.airport}
+window: 3600 #seconds
+n_jobs: -1 #num cpus
+parallel: True
+download: False
+overwrite: False
