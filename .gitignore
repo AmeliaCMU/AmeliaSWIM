@@ -3,6 +3,8 @@ swim_out/
 swim_data/
 outputs/
 out
+out_data/
+slurm_logs/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

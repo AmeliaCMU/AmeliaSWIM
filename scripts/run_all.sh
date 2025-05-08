@@ -1,22 +1,19 @@
 #!/bin/bash
+set -e
 
-# Define an array of tuples, each containing 2 strings
 list=(
-    "kpwk default"
-    "kbfi default"    
-    "khwd default"
-    "kmem default"
-    "kmke default"
-    "koak default"
-    "korl default"
+  "katl week"
+  "kbdl week"
+  "kbfi week"
+  "kbwi week"
+  "kcle week"
 )
 
 # Iterate through each tuple
 for element in "${list[@]}"; do
     # Split the element into two strings
-    string1="${element%% *}"
-    string2="${element#* }"
-    echo "Pair $((i+1)): $string1, $string2"
-
-    sbatch scripts/run_pair.sbatch "$string1" "$string2"
+    airport="${element%% *}"
+    time="${element#* }"
+    echo "Pair: $airport, $time"
+    python process.py data=${data} airports=${airport}
 done
