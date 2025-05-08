@@ -213,7 +213,7 @@ class Data:
             print("File Corrupt!")
         return data
 
-     def process_data(self):
+    def process_data(self):
         while self.end_datetime - self.start_time >= 100:
             log.info(
                 "Currently processing from %s to %s",
