@@ -69,7 +69,7 @@ def main():
                         help='Start time in the format YYYY-MM-DD HH:MM:SS (default: 2023-01-01 00:00:00)')
     parser.add_argument('--end_time', default='2023-01-02 00:00:00',
                         help='End time in the format YYYY-MM-DD HH:MM:SS (default: 2023-01-02 00:00:00)')
-    parser.add_argument('--destination', required=False, default="out/raw",
+    parser.add_argument('--destination', required=False, default="../out/raw",
                         help='Local directory to save the downloaded files')
 
     args = parser.parse_args()
