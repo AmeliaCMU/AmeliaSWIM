@@ -2,12 +2,17 @@
 set -e
 
 list=(
-  "katl week"
-  "kbdl week"
-  "kbfi week"
-  "kbwi week"
-  "kcle week"
+  "kpdx week"
+  "kphl week"
+  "kphx week"
+  "kphx week"
+  "kpit week"
+  "kpvd week"
+  "kpwk week"
+  "ksan week"
 )
+
+
 
 # Iterate through each tuple
 for element in "${list[@]}"; do
@@ -15,5 +20,5 @@ for element in "${list[@]}"; do
     airport="${element%% *}"
     time="${element#* }"
     echo "Pair: $airport, $time"
-    python process.py data=${data} airports=${airport}
+    python process.py data=${time} airports=${airport}
 done
