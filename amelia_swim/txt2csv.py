@@ -1,7 +1,7 @@
 import csv
 
 # Input and output file names
-airport = 'kden'
+airport = 'klas'
 input_file = f'/Users/alonso.cano/Desktop/{airport}.txt'
 output_file = f'conf/qgist/{airport}_v1.csv'
 
