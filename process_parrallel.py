@@ -358,7 +358,7 @@ class Data:
         # Create time chunks
         windows: list[tuple[int,int,int]] = []          # (win_id, start_ts, end_ts)
         start_ts, end_ts   = self.start_time, self.end_time
-        win_id             = 0
+        win_id             = 1
         while self.end_datetime - start_ts >= 100:      # same termination crit.
             windows.append((win_id, start_ts, end_ts))
             start_ts  += self.cfg.data.window
