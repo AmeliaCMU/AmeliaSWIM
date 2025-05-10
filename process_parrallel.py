@@ -1,28 +1,29 @@
-from download_raw import MinioFileDownloader
-from hydra.utils import instantiate
-import hydra
-import logging
-from omegaconf import DictConfig, OmegaConf
-import gzip
-from geographiclib.geodesic import Geodesic
 import os
-from glob import glob
-import json
-import xml.etree.ElementTree as ET
-from collections import defaultdict
-import pandas as pd
-import datetime
-import copy
-from tqdm import tqdm
-import numpy as np
-from shapely.geometry import Point
-from shapely.geometry.polygon import Polygon
+# To avoid CPU overload
+os.environ["PYTHONWARNINGS"] = "ignore"
 import re
-from joblib import Parallel, delayed
-import warnings
 import ast
+import copy
+import json
+import hydra
+import gzip
+import logging
+import warnings
+import datetime
 import collections
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
+import xml.etree.ElementTree as ET
 
+from glob import glob
+from shapely.geometry import Point
+from collections import defaultdict
+from omegaconf import DictConfig
+from download_raw import MinioFileDownloader
+from geographiclib.geodesic import Geodesic
+from shapely.geometry.polygon import Polygon
+from joblib import Parallel, delayed, parallel_backend
 
 warnings.filterwarnings("ignore")
 
@@ -213,165 +214,164 @@ class Data:
             print("File Corrupt!")
         return data
 
+    def _process_window(
+        self, 
+        window_id: int, 
+        start_time: int, 
+        end_time: int
+    ):
+        log.info(
+            "Processing window %d: from %s to %s",
+            window_id,
+            datetime.datetime.fromtimestamp(start_time).strftime("%c"),
+            datetime.datetime.fromtimestamp(end_time).strftime("%c"),
+        )
+        polygons_to_process = collections.deque(range(self.num_polygons))
+        if not self.overwrite:
+            for polygon_num in range(self.num_polygons):
+                csv_file = f"{self.outpath}/{self.airport}_{polygon_num}_{window_id}_{start_time}.csv"
+                if os.path.exists(csv_file):
+                    polygons_to_process.popleft()
+                    print("Skipping - File Exists: {}".format(csv_file))
+
+        if len(polygons_to_process) == 0:
+            return
+
+        filtered_filelist = [
+            i
+            for i in self.sorted_filelist
+            if int(i[0]) > start_time - 3700
+            and int(i[0]) < end_time + 100
+        ]
+        log.info("Num Files: %s", len(filtered_filelist))
+        if len(filtered_filelist) < 5:
+            log.error("Error: Skipping: Num files less than 5")
+            return
+
+        if self.cfg.data.parallel:
+            results = Parallel(n_jobs=self.io_cores, prefer="threads")(
+                delayed(self.read_file)(t, i) for t, i in filtered_filelist
+            )
+            self.data = [item for sublist in results for item in sublist]
+        else:
+            self.data = []
+            for t, filename in tqdm(filtered_filelist):
+                log.info(
+                    "Processing: %s %s ",
+                    filename,
+                    datetime.datetime.fromtimestamp(int(t)).strftime("%c"),
+                )
+                self.data.append(self.read_file(t, filename))
+
+        if len(self.data) == 0:
+            log.error("Error: No data")
+            return
+
+        df = pd.DataFrame(self.data, columns=self.fields)
+        df["datetime"] = pd.to_datetime(df["datetime"])
+        df.index = df["datetime"]
+        del df["datetime"]
+        df = df.sort_values(by="datetime")
+        df = df.groupby("ID").resample("S").mean()
+        df["Interp"] = df["Lat"].apply(new_column_value)
+        df["Heading"] = np.deg2rad(df["Heading"])
+        df["Heading"] = df.groupby("ID")["Heading"].transform(unwrap_with_nans)
+        df["Heading"] = np.rad2deg(df["Heading"])
+
+        for field in ["Altitude", "Speed", "Heading", "Type", "Lat", "Lon"]:
+            df[field] = (
+                df[field]
+                .groupby("ID")
+                .apply(lambda group: group.interpolate(limit_direction="both"))
+            )
+
+        for field in ["Lat", "Lon"]:
+            df[field] = (
+                df[field].groupby("ID").apply(
+                    lambda group: group.interpolate(limit_direction="both", limit=10))
+            )
+
+        for field in ["Altitude", "Speed", "Heading", "Lat", "Lon"]:
+            df[field] = (df[field].groupby("ID").apply(
+                lambda group: group.rolling(5, min_periods=1, center=True).mean())
+            )
+        df["Heading"] %= 360
+        df[["Range", "Bearing"]] = df.apply(
+            lambda row: self.get_range_and_bearing(
+                self.ref_lat, self.ref_lon, row["Lat"], row["Lon"]), axis=1, result_type="expand",
+        )
+        df["Type"].fillna(2, inplace=True)
+        df = df.dropna()
+        df.reset_index(level=0, inplace=True)
+        df = df[df["Altitude"] < self.max_alt]
+
+        start = datetime.datetime.fromtimestamp(
+            start_time, tz=datetime.timezone.utc
+        )
+        end = datetime.datetime.fromtimestamp(
+            end_time, tz=datetime.timezone.utc
+        )
+
+        for polygon_num in polygons_to_process:
+            tmp_df = df.copy()
+            tmp_df["geometry"] = [Point(xy) for xy in zip(tmp_df["Lat"], tmp_df["Lon"])]
+            tmp_df["geometry"] = tmp_df["geometry"].apply(self.polygon[polygon_num].contains)
+            tmp_df = tmp_df[tmp_df["geometry"] == True]
+            del tmp_df["geometry"]
+            tmp_df = tmp_df.sort_values(by="datetime")
+            if tmp_df.empty:
+                print(f"Error: DataFrame is empty! Fence: {polygon_num}")
+                continue
+            tmp_df = tmp_df.assign(x=lambda x: (x["Range"] * np.cos(x["Bearing"])))
+            tmp_df = tmp_df.assign(y=lambda x: (x["Range"] * np.sin(x["Bearing"])))
+            tmp_df["time"] = tmp_df.index
+            first = tmp_df["time"].iloc[0]
+            tmp_df["Frame"] = (tmp_df["time"] - first).dt.total_seconds()
+            tmp_df["Frame"] = tmp_df["Frame"].astype("int")
+            del tmp_df["time"]
+            cols = list(tmp_df.columns)
+            cols = [cols[-1]] + cols[:-1]
+            tmp_df = tmp_df[cols]
+
+            tmp_df = tmp_df.loc[pd.to_datetime(start): pd.to_datetime(end)]
+            if tmp_df.empty:
+                print(f"Error: DataFrame is empty! Fence: {polygon_num}")
+                continue
+            tmp_df["Frame"] = tmp_df["Frame"] - tmp_df["Frame"].iloc[0]
+            csv_file = f"{self.outpath}/{self.airport}_{polygon_num}_{window_id}_{start_time}.csv"
+            tmp_df.to_csv(csv_file, index=False)
+
+
     def process_data(self):
-        # Parallel setting
+        # Configure setting for parallel processing
         cores = self.cfg.data.n_jobs
         if cores == -1:
-            cores   = os.cpu_count()
-        io_cores    = cores // 2
-        chunk_cores = cores // 2
+            cores = os.cpu_count()
+        else:
+            cores = min(cores, os.cpu_count())  # Ensure cores do not exceed available CPUs
+        self.io_cores = max(1, cores // 2)  # At least 1 core for IO
+        self.chunk_cores = max(1, cores - self.io_cores)  # Remaining cores for chunking
         print(f"\033[1;34m [ INFO ] Using {cores} cores for processing\033[0m")
-        print(f"\033[1;34m [ INFO ] Using {io_cores} cores for IO\033[0m")
-        print(f"\033[1;34m [ INFO ] Using {chunk_cores} cores for chunking\033[0m")
+        print(f"\033[1;34m [ INFO ] Using {self.io_cores} cores for IO\033[0m")
+        print(f"\033[1;34m [ INFO ] Using {self.chunk_cores} cores for chunking\033[0m")
         
-        while self.end_datetime - self.start_time >= 100:
-            log.info(
-                "Currently processing from %s to %s",
-                datetime.datetime.fromtimestamp(self.start_time).strftime("%c"),
-                datetime.datetime.fromtimestamp(self.end_time).strftime("%c"),
+        # Create time chunks
+        windows: list[tuple[int,int,int]] = []          # (win_id, start_ts, end_ts)
+        start_ts, end_ts   = self.start_time, self.end_time
+        win_id             = 0
+        while self.end_datetime - start_ts >= 100:      # same termination crit.
+            windows.append((win_id, start_ts, end_ts))
+            start_ts  += self.cfg.data.window
+            end_ts    += self.cfg.data.window
+            win_id    += 1
+        
+        # breakpoint()
+        with parallel_backend("loky", n_jobs=self.chunk_cores):
+            Parallel(n_jobs=self.chunk_cores)(
+                delayed(self._process_window)(win_id, start_ts, end_ts) for win_id, start_ts, end_ts in windows
             )
-            polygons_to_process = collections.deque(range(self.num_polygons))
-            if not self.overwrite:
-                for polygon_num in range(self.num_polygons):
-                    csv_file = f"{self.outpath}/{self.airport}_{polygon_num}_{self.count}_{self.start_time}.csv"
-                    if os.path.exists(csv_file):
-                        polygons_to_process.popleft()
-                        print("Skipping - File Exists: {}".format(csv_file))
-
-            if len(polygons_to_process) == 0:
-                self.start_time = self.start_time + self.cfg.data.window
-                self.end_time = self.end_time + self.cfg.data.window
-                continue
-
-            filtered_filelist = [
-                i
-                for i in self.sorted_filelist
-                if int(i[0]) > self.start_time - 3700
-                and int(i[0]) < self.end_time + 100
-            ]
-            log.info("Num Files: %s", len(filtered_filelist))
-            if len(filtered_filelist) < 5:
-                log.error("Error:  Skipping: Num files less than 5")
-                self.start_time = self.start_time + self.cfg.data.window
-                self.end_time = self.end_time + self.cfg.data.window
-                continue
-            if self.cfg.data.parallel == True:
-                results = Parallel(n_jobs=self.cfg.data.n_jobs)(
-                    delayed(self.read_file)(t, i) for t, i in filtered_filelist
-                )
-                self.data = [item for sublist in results for item in sublist]
-            else:
-                self.data = []
-                for t, filename in tqdm(filtered_filelist):
-                    log.info(
-                        "Processing: %s %s ",
-                        filename,
-                        datetime.datetime.fromtimestamp(int(t)).strftime("%c"),
-                    )
-                    self.data.append(self.read_file(t, filename))
-
-            # No data
-            if len(self.data) == 0:
-                # add data gabber here
-                log.error("Error:  No data")
-                self.start_time = self.start_time + self.cfg.data.window
-                self.end_time = self.end_time + self.cfg.data.window
-                continue
-            df = pd.DataFrame(self.data, columns=self.fields)
-            # save a ckpt csv for testing
-            # df.to_csv('raw.csv')
-            df["datetime"] = pd.to_datetime(df["datetime"])
-            df.index = df["datetime"]
-            del df["datetime"]
-            df = df.sort_values(by="datetime")
-            # interpolation
-            df = df.groupby("ID").resample("S").mean()
-            df["Interp"] = df["Lat"].apply(new_column_value)
-            # save a ckpt csv for testing
-            # df.to_csv('test_after_groupby.csv')
-            df["Heading"] = np.deg2rad(df["Heading"])
-            # handle unwrapping with NaNs
-            df["Heading"] = df.groupby("ID")["Heading"].transform(unwrap_with_nans)
-            df["Heading"] = np.rad2deg(df["Heading"])
-
-            for field in ["Altitude", "Speed", "Heading", "Type", "Lat", "Lon"]:
-                df[field] = (
-                    df[field]
-                    .groupby("ID")
-                    .apply(lambda group: group.interpolate(limit_direction="both"))
-                )
-
-            for field in ["Lat", "Lon"]:
-                df[field] = (
-                    df[field].groupby("ID").apply(
-                        lambda group: group.interpolate(limit_direction="both", limit=10))
-                )
-
-            for field in ["Altitude", "Speed", "Heading", "Lat", "Lon"]:
-                df[field] = (df[field].groupby("ID").apply(
-                    lambda group: group.rolling(5, min_periods=1, center=True).mean())
-                )
-            # Angle Wrap
-            df["Heading"] %= 360
-
-            # save a ckpt csv for testing
-            # df.to_csv('test_after_interpolation.csv')
-
-            df[["Range", "Bearing"]] = df.apply(
-                lambda row: self.get_range_and_bearing(
-                    self.ref_lat, self.ref_lon, row["Lat"], row["Lon"]), axis=1, result_type="expand",
-            )
-            df["Type"].fillna(2, inplace=True)
-            df = df.dropna()
-            # save a ckpt csv for testing
-            # df.to_csv("test_after_dropna.csv")
-            df.reset_index(level=0, inplace=True)
-            # geo filters
-            df = df[df["Altitude"] < self.max_alt]
-
-            start = datetime.datetime.fromtimestamp(
-                self.start_time, tz=datetime.timezone.utc
-            )
-            end = datetime.datetime.fromtimestamp(
-                self.end_time, tz=datetime.timezone.utc
-            )
-
-            # For every polygon (fence) check if the point is inside
-            for polygon_num in polygons_to_process:
-                tmp_df = df.copy()
-                tmp_df["geometry"] = [Point(xy) for xy in zip(tmp_df["Lat"], tmp_df["Lon"])]
-                tmp_df["geometry"] = tmp_df["geometry"].apply(self.polygon[polygon_num].contains)
-                tmp_df = tmp_df[tmp_df["geometry"] == True]
-                del tmp_df["geometry"]
-                tmp_df = tmp_df.sort_values(by="datetime")
-                if tmp_df.empty:
-                    print(f"Error: DataFrame is empty! Fence: {polygon_num}")
-                    continue
-                # additional cols for traj pred compatibility
-                tmp_df = tmp_df.assign(x=lambda x: (x["Range"] * np.cos(x["Bearing"])))
-                tmp_df = tmp_df.assign(y=lambda x: (x["Range"] * np.sin(x["Bearing"])))
-                tmp_df["time"] = tmp_df.index
-                first = tmp_df["time"].iloc[0]
-                tmp_df["Frame"] = (tmp_df["time"] - first).dt.total_seconds()
-                tmp_df["Frame"] = tmp_df["Frame"].astype("int")
-                del tmp_df["time"]
-                cols = list(tmp_df.columns)
-                cols = [cols[-1]] + cols[:-1]
-                tmp_df = tmp_df[cols]
-
-                tmp_df = tmp_df.loc[pd.to_datetime(start): pd.to_datetime(end)]
-                if tmp_df.empty:
-                    print(f"Error: DataFrame is empty! Fence: {polygon_num}")
-                    continue
-                tmp_df["Frame"] = tmp_df["Frame"] - tmp_df["Frame"].iloc[0]
-                csv_file = f"{self.outpath}/{self.airport}_{polygon_num}_{self.count}_{self.start_time}.csv"
-                tmp_df.to_csv(csv_file, index=False)
-
-            self.start_time = self.start_time + self.cfg.data.window
-            self.end_time = self.end_time + self.cfg.data.window
-
-            self.count += 1
-
+        log.info("Processing complete.")
+           
     def get_range_and_bearing(self, lat1, lon1, lat2, lon2):
 
         lat2 = float(lat2)

@@ -1,7 +1,7 @@
 datapath: "out/klax"
-outpath: "out_data/klax"
+outpath: "out_data/parallel_test_parallel_v2"
 window: 3600 ##sec
 n_jobs: -1 #num cpus
 parallel: True
-download: True
+download: False
 overwrite: False
