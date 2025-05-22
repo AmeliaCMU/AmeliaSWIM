@@ -214,6 +214,16 @@ class Data:
         return data
 
     def process_data(self):
+        # Parallel setting
+        cores = self.cfg.data.n_jobs
+        if cores == -1:
+            cores   = os.cpu_count()
+        io_cores    = cores // 2
+        chunk_cores = cores // 2
+        print(f"\033[1;34m [ INFO ] Using {cores} cores for processing\033[0m")
+        print(f"\033[1;34m [ INFO ] Using {io_cores} cores for IO\033[0m")
+        print(f"\033[1;34m [ INFO ] Using {chunk_cores} cores for chunking\033[0m")
+        
         while self.end_datetime - self.start_time >= 100:
             log.info(
                 "Currently processing from %s to %s",

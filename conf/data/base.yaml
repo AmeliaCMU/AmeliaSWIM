@@ -1,7 +1,7 @@
-datapath: "out/klax"
-outpath: "out_data/klax"
+datapath: "/ocean/projects/cis220039p/mdt2/datasets/boeing"
+outpath: "out_data/amelia42"
 window: 3600 ##sec
 n_jobs: -1 #num cpus
 parallel: True
-download: True
+download: False
 overwrite: False
