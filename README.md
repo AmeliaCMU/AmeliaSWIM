@@ -51,7 +51,7 @@ To download the processed data for 10 airports used for the Amelia Benchmark [li
 
 ### Download and Process Raw Data for any of the 42 airports
 
-To download and convert trajectory data for any of the 42 airports in the [Amelia Tracker](https://ameliacmu.github.io/amelia-dataset/) for any time after Dec 1 2022, use the following steps
+To download and convert trajectory data for any of the 42 airports in the [Amelia Dataset](https://ameliacmu.github.io/amelia-dataset/) for any time after Dec 1 2022, use the following steps
 
 
 ### Download raw files
