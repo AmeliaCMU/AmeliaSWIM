@@ -11,9 +11,9 @@ Zelin Ye, Jong Hoon Park, [Jean Oh](https://cmubig.github.io/team/jean_oh/) and 
 
 ## Overview
 
-**AmeliaSWIM**: Tool that contains the raw dataset download scripts as well as scripts to preprocess and filter the data.
+**AmeliaSWIM**: This tool that contains the raw dataset download scripts as well as scripts to preprocess and filter the data. It also contains the fences used on QGIST to delimit the ROI of the airports.
 
-[Amelia-48](https://ameliacmu.github.io/amelia-dataset/) dataset contains the trajectory as well map data. More information is available on the dataset [website](https://ameliacmu.github.io/amelia-dataset/).
+[Amelia-42](https://ameliacmu.github.io/amelia-dataset/) dataset contains the trajectory as well map data. More information is available on the dataset [website](https://ameliacmu.github.io/amelia-dataset/) and a subset of this prosseed data can be found in HuggingFace [Amelia42-Mini](https://huggingface.co/datasets/AmeliaCMU/Amelia42-Mini) and our Benchmark dataset in [Amelia10](https://huggingface.co/datasets/AmeliaCMU/Amelia-10).
 
 ## Pre-requisites
 
@@ -34,25 +34,29 @@ Alternatively, refer to [`INSTALL.md`](https://github.com/AmeliaCMU/AmeliaScenes
 
 **Note:** AmeliaSWIM only requires the itself to run, only refer to AmeliaSWIM installation.
 
-## Processed Data for 10 airports
+## Download Processed Data for 10 airports
 
-Processed data (trajectory+map) for 10 airports [list](https://ameliacmu.github.io/amelia-dataset/) can be found at [dataset](https://airlab-share-01.andrew.cmu.edu:9000/amelia-processed/amelia-10.zip)
+To download the processed data for 10 airports used for the Amelia Benchmark [list](https://ameliacmu.github.io/amelia-dataset/) can be found at [dataset](https://huggingface.co/datasets/AmeliaCMU/Amelia-10), this will contain the processed csv files and the map assets and contains the following airports one month of the following airports:
 
-## Raw Data for any of the 48 airports
+- Boston-Logan Intl. Airport - Jan 2023
+- Newark Liberty Intl. Airport - Mar 2023
+- Ronald Reagan Washington Natl. Airport - April 2023
+- John F. Kennedy Intl. Airport - April 2023
+- Los Angeles Intl. Airport - May 2023
+- Chicago-Midway Intl. Airport - June 2023
+- Louis Armstrong New Orleans Intl. Airport - July 2023
+- Seattle-Tacoma Intl. Airport - Aug 2023
+- San Francisco Intl. Airport - Sept 2023
+- Ted Stevens Anchorage Intl. Airport - Nov 2023
 
-To download and convert trajectory data for any of the 48 airports in the [Data Tracker](https://ameliacmu.github.io/amelia-dataset/) for any time after Dec 1 2022, use the following steps
+### Download and Process Raw Data for any of the 42 airports
 
-## How to use
+To download and convert trajectory data for any of the 42 airports in the [Amelia Tracker](https://ameliacmu.github.io/amelia-dataset/) for any time after Dec 1 2022, use the following steps
 
-Activate your amelia environment (**Please follow the installation instructions above**):
-
-```bash
-conda activate amelia
-```
 
 ### Download raw files
 
-The raw SWIM SMES `.njson.gz` files can be downloaded using the following scripts:
+The raw SWIM SMES `.njson.gz` files can be downloaded using the following script:
 
 ```bash
 python download_raw.py --endpoint <minio-endpoint> \
@@ -70,7 +74,10 @@ Where:
 - `<end_time>`: The end time in the format `YYYY-MM-DD HH:MM:SS`. By default it is set to `2023-01-02 00:00:00`.
 - `<destination>`: Local directory to save the downloaded files. By default it is set to `swim_data/`.
 
-### Process Data
+This will download the raw files from the MinIO server and save them in the specified destination directory.
+
+
+### Process Data (convert files from njson to csv)
 
 ```bash
 python process.py data=<insert_month> airports=<airport_ICAO>
@@ -78,8 +85,17 @@ python process.py data=<insert_month> airports=<airport_ICAO>
 
 Where:
 
-- `<insert_month>`: The month for which you want to process the data. The available months are `jan`, `feb`, `mar`, `apr`, `may`, `jun`, `jul`, `aug`, `sep`, `oct`, `nov`, `dec`, `base`, `default`.
-- `<airport_ICAO>`: The ICAO code of the airport for which you want to process the data. The available airports are `katl`, `kaus`, `kbdl`, `kbfi`, `kbna`, `kbos`, `kbwi`, `kcle`, `kclt`, `kcvg`, `kdab`, `kdal`, `kdca`, `kden`, `kdfw`, `kdtw`, `kewr`, `kfll`, `khou`, `khwd`, `kiad`, `kiah`, `kjfk`, `klas`, `klax`, `klga`, `kmci`, `kmco`, `kmdw`, `kmem`, `kmia`, `kmke`, `kmsp`, `kmsy`, `koak`, `kord`, `korl`, `kpdx`, `kphl`, `kphx`, `kpit`, `kpvd`, `kpwk`, `ksan`, `ksdf`, `ksea`, `ksfo`, `ksjc`, `kslc`, `ksna`, `kstl`, `kteb`, `panc`, `phnl`.
+- `<insert_month>`: Specifies the month for which you want to process the data. You may set any of the yaml files in the path `conf/data/*/*.yaml` for example `apr` or set your own. This will determine the time frame that to witch process the data.
+In the `conf/data` folder there is also a `base.yaml` file wher it is possible to set the following options:
+  - `datapath`: where the raw files should be downloaded or searched (if `download` is set to `True`)
+  - `out_path`: output director of the processed files in csv format
+  - `window`: Time (in sec) Duration for each CSV
+  - `n_jobs`: Num CPUs to use
+  - `parallel`: Use parallel processing
+  - `download`: Download the Raw Data (set to false if you already have the raw data in the `datapath` directory)
+  - `overwrite`: Overwrite the processed data if it is found
+
+- `<airport_ICAO>`: The ICAO code of the airport for which you want to process the data. The available airports are set in the `conf/airports` folder. You can set any of the yaml files in the path `conf/airports/*/*.yaml` for example `klax`.
 
 #### Other Options
 
@@ -111,7 +127,7 @@ If you would like to process the data for KLAX for Mar 2023 overwriting the exis
 python python process.py data=mar airports=klax data.overwrite=True data.download=False
 ```
 
-## Modify / Create Polygons
+## Modify / Create Polygons in QGIST
 
 In order to modify or create new polygons, we used the [QGIS](https://qgis.org/en/site/) software.
 
