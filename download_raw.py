@@ -1,70 +1,120 @@
 import argparse
 import os
 import time
-from minio import Minio
-from minio.error import S3Error
+import requests
 from datetime import datetime
 from tqdm import tqdm
+from urllib.parse import urljoin
 
-class MinioFileDownloader:
-    def __init__(self, endpoint="airlab-share-01.andrew.cmu.edu:9000", bucket_name="ameliaswim"):
-        self.client = Minio(endpoint, secure=True)
-        self.bucket_name = bucket_name
 
-    def download_files(self, start_time, end_time, destination_folder,time_format="human"):
-        # Create destination folder if it doesn't exist
-        if not os.path.exists(destination_folder):
-            os.makedirs(destination_folder)
-        if time_format =="human":
-            start_timestamp = int(time.mktime(time.strptime(start_time, '%Y-%m-%d %H:%M:%S')))
-            end_timestamp = int(time.mktime(time.strptime(end_time, '%Y-%m-%d %H:%M:%S')))
-        elif time_format=="unix":
+class SwiftFileDownloader:
+    def __init__(self, base_url):
+        """
+        base_url example:
+        https://airlab-cloud.andrew.cmu.edu:8080/swift/v1/AUTH_xxx/amelia_swim/
+        """
+        if not base_url.endswith("/"):
+            base_url += "/"
+        self.base_url = base_url
+
+    def download_files(self, start_time, end_time, destination_folder, time_format="human"):
+        # Ensure output directory exists
+        os.makedirs(destination_folder, exist_ok=True)
+
+        # Convert human → unix timestamps
+        if time_format == "human":
+            start_timestamp = int(time.mktime(time.strptime(start_time, "%Y-%m-%d %H:%M:%S")))
+            end_timestamp = int(time.mktime(time.strptime(end_time, "%Y-%m-%d %H:%M:%S")))
+        elif time_format == "unix":
             start_timestamp = start_time
             end_timestamp = end_time
         else:
-            print("Time format invalid..")    
-        for i in range(1, 9):
-            prefix = f'ALL{i}_'
-            print("For Prefix",prefix,"in 1 to 8")
-            objects = self.client.list_objects(self.bucket_name,prefix=prefix)
-            for obj in (objects):
-                file_timestamp = int(obj.object_name.split('_')[1].split('.')[0])
-                # print("Checking", file_timestamp)
-                if start_timestamp <= file_timestamp <= end_timestamp:
-                    self._download_file(obj.object_name, destination_folder)
+            raise ValueError("Invalid time_format")
 
-    def _download_file(self, object_name, destination_folder):
-        file_path = os.path.join(destination_folder, object_name)
-        if not os.path.exists(file_path):
-            try:
-                response = self.client.get_object(self.bucket_name, object_name)
-                with open(file_path, "wb") as file_data:
-                    for d in response.stream(32 * 1024):
-                        file_data.write(d)
-                response.close()
-                response.release_conn()
-                # Get timestamp from the object name and convert it to human-readable format
-                timestamp = int(object_name.split('_')[1].split('.')[0])
-                human_readable_time = datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
-                print(f"\nDownloaded {object_name} ({human_readable_time})")
-            except S3Error as err:
-                print(f"Failed to download {object_name}: {err}")
-        else:
-            print(f"File {object_name} already exists, skipping download.")
-    
+        print(f"Start TS: {start_timestamp}   End TS: {end_timestamp}")
+
+        # loop over prefixes ALL1_ to ALL8_
+        for i in range(1, 9):
+            prefix = f"ALL{i}_"
+            print(f"\n🔍 Checking prefix: {prefix}")
+
+            # List files under this prefix
+            file_list = self._list_objects(prefix)
+
+            for fname in file_list:
+                try:
+                    file_timestamp = int(fname.split("_")[1].split(".")[0])
+                except Exception:
+                    continue
+
+                if start_timestamp <= file_timestamp <= end_timestamp:
+                    self._download_file(fname, destination_folder)
+
+    def _list_objects(self, prefix):
+        """Fetch file list by scraping the Swift directory index."""
+        list_url = urljoin(self.base_url, f"?prefix={prefix}")
+        resp = requests.get(list_url)
+
+        if resp.status_code != 200:
+            print(f"Failed to list prefix: {prefix}")
+            return []
+
+        # Swift returns plain text, one file per line
+        files = resp.text.strip().split("\n")
+        files = [f for f in files if f.startswith(prefix)]
+
+        print(f"Found {len(files)} files for {prefix}")
+        return files
+
+    def _download_file(self, filename, destination_folder):
+        local_path = os.path.join(destination_folder, filename)
+
+        if os.path.exists(local_path):
+            print(f"✔ {filename} already exists, skipping.")
+            return
+
+        url = urljoin(self.base_url, filename)
+        print(f"⬇ Downloading {filename}")
+
+        with requests.get(url, stream=True) as r:
+            if r.status_code != 200:
+                print(f"❌ Failed: {filename} ({r.status_code})")
+                return
+
+            total_size = int(r.headers.get("Content-Length", 0))
+
+            with open(local_path, "wb") as f, tqdm(
+                total=total_size,
+                unit="B",
+                unit_scale=True,
+                desc=filename,
+                leave=True
+            ) as pbar:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        pbar.update(len(chunk))
+
+        ts = int(filename.split("_")[1].split(".")[0])
+        human = datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
+        print(f"✔ Downloaded {filename} ({human})")
+
 
 def main():
-    parser = argparse.ArgumentParser(description='Download files from a MinIO bucket within a specified time range.')
-    parser.add_argument('--endpoint', required=False, default="airlab-share-01.andrew.cmu.edu:9000", help='MinIO server endpoint')
-    parser.add_argument('--bucket', required=False,default="ameliaswim", help='Name of the bucket to download files from')
-    parser.add_argument('--start_time', default='2023-01-01 00:00:00', help='Start time in the format YYYY-MM-DD HH:MM:SS (default: 2023-01-01 00:00:00)')
-    parser.add_argument('--end_time', default='2023-01-02 00:00:00', help='End time in the format YYYY-MM-DD HH:MM:SS (default: 2023-01-02 00:00:00)')
-    parser.add_argument('--destination', required=False,default="swim_data/", help='Local directory to save the downloaded files')
-
+    parser = argparse.ArgumentParser(description="Download files from OpenStack Swift time range.")
+    parser.add_argument(
+        "--base_url",
+        required=False,
+        default="https://airlab-cloud.andrew.cmu.edu:8080/swift/v1/AUTH_ac8533a83cff4d48bc8c608ad222d330/amelia_swim/",
+    )
+    parser.add_argument("--start_time", default="2023-01-01 00:00:00")
+    parser.add_argument("--end_time", default="2023-01-02 00:00:00")
+    parser.add_argument("--destination", default="swim_data/")
     args = parser.parse_args()
 
-    downloader = MinioFileDownloader(args.endpoint, args.bucket)
+    downloader = SwiftFileDownloader(args.base_url)
     downloader.download_files(args.start_time, args.end_time, args.destination)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
