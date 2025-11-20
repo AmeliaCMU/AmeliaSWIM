@@ -73,7 +73,7 @@ class SwiftFileDownloader:
 
             print(f"Retrieved {len(page)} more objects... total so far: {len(files)}")
 
-        print(f"📦 Total objects in bucket: {len(files)}")
+        print(f"Total objects in bucket: {len(files)}")
         return files
 
     def _download_file(self, filename, destination_folder):
