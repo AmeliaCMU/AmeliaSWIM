@@ -71,8 +71,6 @@ class SwiftFileDownloader:
             # Prepare next page
             marker = page[-1]
 
-            print(f"Retrieved {len(page)} more objects... total so far: {len(files)}")
-
         print(f"Total objects in bucket: {len(files)}")
         return files
 
