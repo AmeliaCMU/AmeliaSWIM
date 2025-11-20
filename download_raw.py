@@ -9,17 +9,12 @@ from urllib.parse import urljoin
 
 class SwiftFileDownloader:
     def __init__(self, base_url):
-        """
-        base_url example:
-        https://airlab-cloud.andrew.cmu.edu:8080/swift/v1/AUTH_xxx/amelia_swim/
-        """
-        if not base_url.endswith("/"):
-            base_url += "/"
         self.base_url = base_url
 
     def download_files(self, start_time, end_time, destination_folder, time_format="human"):
         # Ensure output directory exists
-        os.makedirs(destination_folder, exist_ok=True)
+        if not os.path.exists(destination_folder):
+            os.makedirs(destination_folder, exist_ok=True)
 
         # Convert human → unix timestamps
         if time_format == "human":
@@ -33,52 +28,67 @@ class SwiftFileDownloader:
 
         print(f"Start TS: {start_timestamp}   End TS: {end_timestamp}")
 
-        # loop over prefixes ALL1_ to ALL8_
-        for i in range(1, 9):
-            prefix = f"ALL{i}_"
-            print(f"\n🔍 Checking prefix: {prefix}")
+        file_list = self._list_all_objects()
 
-            # List files under this prefix
-            file_list = self._list_objects(prefix)
+        for fname in file_list:
+            if not fname.startswith("ALL"):
+                continue
+            try:
+                file_timestamp = int(fname.split("_")[1].split(".")[0])
+            except Exception:
+                continue
 
-            for fname in file_list:
-                try:
-                    file_timestamp = int(fname.split("_")[1].split(".")[0])
-                except Exception:
-                    continue
+            if start_timestamp <= file_timestamp <= end_timestamp:
+                self._download_file(fname, destination_folder)
+    
+    def _list_all_objects(self):
+        """List ALL objects in Swift with pagination."""
+        files = []
+        marker = None
 
-                if start_timestamp <= file_timestamp <= end_timestamp:
-                    self._download_file(fname, destination_folder)
+        while True:
+            params = {"format": "plain"}
+            if marker:
+                params["marker"] = marker
 
-    def _list_objects(self, prefix):
-        """Fetch file list by scraping the Swift directory index."""
-        list_url = urljoin(self.base_url, f"?prefix={prefix}")
-        resp = requests.get(list_url)
+            resp = requests.get(self.base_url, params=params)
+            
+            if resp.status_code == 204:
+                # No more objects
+                break
+            if resp.status_code != 200:
+                print(f"Failed listing (HTTP {resp.status_code})")
+                break
 
-        if resp.status_code != 200:
-            print(f"Failed to list prefix: {prefix}")
-            return []
+            page = resp.text.splitlines()
 
-        # Swift returns plain text, one file per line
-        files = resp.text.strip().split("\n")
-        files = [f for f in files if f.startswith(prefix)]
+            if not page:
+                # No more objects
+                break
 
-        print(f"Found {len(files)} files for {prefix}")
+            files.extend(page)
+
+            # Prepare next page
+            marker = page[-1]
+
+            print(f"Retrieved {len(page)} more objects... total so far: {len(files)}")
+
+        print(f"📦 Total objects in bucket: {len(files)}")
         return files
 
     def _download_file(self, filename, destination_folder):
         local_path = os.path.join(destination_folder, filename)
 
         if os.path.exists(local_path):
-            print(f"✔ {filename} already exists, skipping.")
+            print(f"File {filename} already exists, skipping.")
             return
 
         url = urljoin(self.base_url, filename)
-        print(f"⬇ Downloading {filename}")
+        print(f"Downloading {filename}")
 
         with requests.get(url, stream=True) as r:
             if r.status_code != 200:
-                print(f"❌ Failed: {filename} ({r.status_code})")
+                print(f"Failed: {filename} ({r.status_code})")
                 return
 
             total_size = int(r.headers.get("Content-Length", 0))
@@ -97,19 +107,18 @@ class SwiftFileDownloader:
 
         ts = int(filename.split("_")[1].split(".")[0])
         human = datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
-        print(f"✔ Downloaded {filename} ({human})")
-
+        print(f"Downloaded {filename} ({human})")
 
 def main():
-    parser = argparse.ArgumentParser(description="Download files from OpenStack Swift time range.")
+    parser = argparse.ArgumentParser(description="Download files from OpenStack Swift within a specified time range.")
     parser.add_argument(
         "--base_url",
         required=False,
         default="https://airlab-cloud.andrew.cmu.edu:8080/swift/v1/AUTH_ac8533a83cff4d48bc8c608ad222d330/amelia_swim/",
     )
-    parser.add_argument("--start_time", default="2023-01-01 00:00:00")
-    parser.add_argument("--end_time", default="2023-01-02 00:00:00")
-    parser.add_argument("--destination", default="swim_data/")
+    parser.add_argument("--start_time", default="2023-01-01 00:00:00", help='Start time in the format YYYY-MM-DD HH:MM:SS (default: 2023-01-01 00:00:00)')
+    parser.add_argument("--end_time", default="2023-01-02 00:00:00", help='End time in the format YYYY-MM-DD HH:MM:SS (default: 2023-01-02 00:00:00)')
+    parser.add_argument("--destination", required=False, default="swim_data/", help='Local directory to save the downloaded files')
     args = parser.parse_args()
 
     downloader = SwiftFileDownloader(args.base_url)
