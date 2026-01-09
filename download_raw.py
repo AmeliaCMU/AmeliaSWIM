@@ -44,7 +44,10 @@ class SwiftFileDownloader:
         else:
             start_ts = start_time
             end_ts = end_time
+            start_time = datetime.fromtimestamp(start_ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            end_time = datetime.fromtimestamp(end_ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
+        print(f"Downloading files from {start_time} to {end_time}")
         print(f"Start TS: {start_ts}, End TS: {end_ts}")
 
         # -----------------------------------------------------
@@ -94,17 +97,18 @@ class SwiftFileDownloader:
         for fname, ts in target_files:
             local_path = os.path.join(destination_folder, fname.split("/")[-1])
 
+            human_time = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
             if os.path.exists(local_path):
-                print(f"Skipping {fname}, already exists.")
+                print(f"Skipping {fname} ({human_time} UTC), already exists.")
                 continue
 
             file_url = urljoin(self.base_url, fname)
-            print(f"Downloading {fname}")
 
             # Stream download
             with requests.get(file_url, stream=True) as r:
                 if r.status_code != 200:
-                    print(f"Failed downloading {fname}: HTTP {r.status_code}")
+                    print(f"Failed downloading {fname} ({human_time} UTC): HTTP {r.status_code}")
                     continue
 
                 total_size = int(r.headers.get("Content-Length", 0))
@@ -113,27 +117,26 @@ class SwiftFileDownloader:
                     total=total_size,
                     unit="B",
                     unit_scale=True,
-                    desc=fname,
+                    desc=f"{fname} ({human_time} UTC)",
                     leave=True
                 ) as pbar:
                     for chunk in r.iter_content(chunk_size=8192):
                         if chunk:
                             f.write(chunk)
                             pbar.update(len(chunk))
-
-            human_time = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-            print(f"Finished {fname} ({human_time} UTC)")
-
         print("All requested files downloaded.")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Download SWIM files using prefix + timestamp filtering.")
-    parser.add_argument("--base_url", 
+    parser.add_argument("--base_url",
                         required=False, default="https://airlab-cloud.andrew.cmu.edu:8080/swift/v1/AUTH_ac8533a83cff4d48bc8c608ad222d330/amelia_swim/")
-    parser.add_argument("--start_time", default="2023-01-01 00:00:00", help='Start time in UTC in the format YYYY-MM-DD HH:MM:SS (default: 2023-01-01 00:00:00)')
-    parser.add_argument("--end_time", default="2023-01-02 00:00:00", help='End time in UTC in the format YYYY-MM-DD HH:MM:SS (default: 2023-01-02 00:00:00)')
-    parser.add_argument("--destination", default="swim_data/", help='Local directory to save the downloaded files')
+    parser.add_argument("--start_time", default="2023-01-01 00:00:00",
+                        help='Start time in UTC in the format YYYY-MM-DD HH:MM:SS (default: 2023-01-01 00:00:00)')
+    parser.add_argument("--end_time", default="2023-01-02 00:00:00",
+                        help='End time in UTC in the format YYYY-MM-DD HH:MM:SS (default: 2023-01-02 00:00:00)')
+    parser.add_argument("--destination", default="datasets/amelia/raw_swim",
+                        help='Local directory to save the downloaded files')
     args = parser.parse_args()
 
     downloader = SwiftFileDownloader(args.base_url)
